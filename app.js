@@ -86,7 +86,7 @@ app.post('/login', async (req, res) => {
       // Generar un token JWT
       const token = jwt.sign({ userId: user.curp }, SECRET_KEY, { expiresIn: '1h' });
 
-      res.status(200).json({ token });
+      res.status(200).json({ token: token, curp: user.curp });
     });
   } catch(err) {
     console.error('Error al iniciar sesión: ', err);
@@ -250,30 +250,6 @@ app.post('/eventos/:id/registrar', verifyToken, (req, res) => {
 });
 
 
-app.get('/evento_usuario/:id', verifyToken, (req, res) => {
-  const idEvento = req.params.id;
-
-  const query = 'SELECT * FROM usuarios_eventos WHERE id = ?';
-  const values = [idEvento];
-
-  connection.query(query, values, (err, result) => {
-    if (err) {
-      console.error('Error al obtener el evento y el usuario: ', err);
-      res.status(500).json({ error: 'Error al obtener evento y al usuario' });
-      return;
-    }
-
-    if (result.length === 0) {
-      res.status(404).json({ error: 'No encontramos el evento al que estas registrado' });
-      return;
-    }
-
-    const evento = result[0];
-    res.status(200).json(evento);
-  })
-});
-
-
 // Registrar asistencia del usuario al evento
 app.post('/eventos/:id/asistencia', verifyToken, (req, res) => {
   const idEvento = req.params.id;
@@ -311,6 +287,40 @@ app.post('/eventos/:id/asistencia', verifyToken, (req, res) => {
       }
       res.status(200).json({ message: 'Asistencia registrada correctamente' })
     });
+  });
+});
+
+app.get('/usuarios/:curp/eventos/proximoEvento', verifyToken, (req, res) => {
+  const curp = req.params.curp;
+
+  // Verificar si el usuario existe
+  const checkUserQuery = 'SELECT * FROM usuarios WHERE curp = ?';
+  connection.query(checkUserQuery, [curp], (err, result) => {
+    if (err) {
+      console.error('Error al verificar el usuario: ', err);
+      res.status(500).json({ error: 'Error al verificar el usuario' });
+      return;
+    }
+
+    if (result.length === 0) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    // Obtener el proximo evento registrado para el usuario
+    const getNextEventQuery = `SELECT e.* FROM eventos e INNER JOIN usuarios_eventos ue ON e.id = ue.evento_id WHERE ue.curp = ? ORDER BY e.fecha ASC, e.hora ASC LIMIT 1`;
+    connection.query(getNextEventQuery, [curp], (err, result) => {
+      if (err) {
+        console.error('Error al obtener el proximo evento del usuario: ', err);
+        res.status(500).json({ error: 'Error al obtener el próximo evento del usuario' });
+        return;
+      }
+
+      if (result.length === 0) {
+        res.status(404).json({ error: 'Usuario no está registrado en ningún evento' });
+        return;
+      }
+      res.status(200).json(result[0]);
+    })
   });
 });
 
