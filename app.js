@@ -211,6 +211,30 @@ app.get('/eventos', (req, res) => {
 });
 
 
+app.get('/evento/proximoEvento', (req, res) => {
+  const currentDate = new Date();
+
+  const query = `SELECT * FROM eventos WHERE fecha > ? OR (fecha = ? AND hora >= ?) ORDER BY fecha ASC, hora ASC LIMIT 1`;
+
+  connection.query(
+    query, [currentDate, currentDate, currentDate.toLocaleTimeString()],
+    (err, result) => {
+      if (err) {
+        console.error('Error al obtener el proximo evento: ', err);
+        res.status(500).json({ error: 'Error al obtener el próximo evento' });
+        return;
+      }
+      if (result.length === 0) {
+        res.status(404).json({ error: 'No hay eventos futuros registrados' });
+        return;
+      }
+
+      res.status(200).json(result[0]);
+    }
+  );
+});
+
+
 
 // Registrar usuarios en eventos
 app.post('/eventos/:id/registrar', verifyToken, (req, res) => {
@@ -292,6 +316,7 @@ app.post('/eventos/:id/asistencia', verifyToken, (req, res) => {
 
 app.get('/usuarios/:curp/eventos/proximoEvento', verifyToken, (req, res) => {
   const curp = req.params.curp;
+  const currentDate = new Date(); // OBtener la fecha y hora actuales
 
   // Verificar si el usuario existe
   const checkUserQuery = 'SELECT * FROM usuarios WHERE curp = ?';
@@ -307,8 +332,8 @@ app.get('/usuarios/:curp/eventos/proximoEvento', verifyToken, (req, res) => {
       return;
     }
     // Obtener el proximo evento registrado para el usuario
-    const getNextEventQuery = `SELECT e.* FROM eventos e INNER JOIN usuarios_eventos ue ON e.id = ue.evento_id WHERE ue.curp = ? ORDER BY e.fecha ASC, e.hora ASC LIMIT 1`;
-    connection.query(getNextEventQuery, [curp], (err, result) => {
+    const getNextEventQuery = `SELECT e.* FROM eventos e INNER JOIN usuarios_eventos ue ON e.id = ue.evento_id WHERE ue.curp = ? AND (e.fecha > ? OR (e.fecha = ? AND e.hora >= ?)) ORDER BY e.fecha ASC, e.hora ASC LIMIT 1`;
+    connection.query(getNextEventQuery, [curp, currentDate, currentDate, currentDate.toLocaleTimeString()], (err, result) => {
       if (err) {
         console.error('Error al obtener el proximo evento del usuario: ', err);
         res.status(500).json({ error: 'Error al obtener el próximo evento del usuario' });
